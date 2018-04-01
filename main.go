@@ -11,9 +11,9 @@ var rootCmd = &cobra.Command{
 	Short: "Deploy applications to Kubernetes.",
 }
 
-var compileCmd = &cobra.Command{
-	Use:   "compile",
-	Short: "Compile a list of Kubernetes manifest templates.",
+var buildCmd = &cobra.Command{
+	Use:   "build",
+	Short: "Build a deployment.",
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		root := "."
@@ -22,16 +22,18 @@ var compileCmd = &cobra.Command{
 			root = args[0]
 		}
 
-		data, err := deploy.CompileManifestTemplates(root)
+		manifestTemplates, err := deploy.LoadManifestTemplatesFromRoot(root)
 
-		fmt.Printf("%s\n", data)
+		for _, manifestTemplate := range manifestTemplates {
+			fmt.Printf("- %s\n", manifestTemplate.Name)
+		}
 
 		return err
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(compileCmd)
+	rootCmd.AddCommand(buildCmd)
 }
 
 func main() {

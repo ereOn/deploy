@@ -1,11 +1,15 @@
 package deploy
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"text/template"
+
+	"gopkg.in/yaml.v2"
 )
 
 // ManifestTemplate represents a templated Kubernetes manifest.
@@ -59,6 +63,43 @@ func LoadManifestTemplatesFromRoot(root string) (templates []ManifestTemplate, e
 	}); err != nil {
 		return nil, err
 	}
+
+	return
+}
+
+// Render the manifest template.
+func (m ManifestTemplate) Render(ctx Context) (manifest Manifest, err error) {
+	var tmpl *template.Template
+	tmpl, err = template.New(m.Name).Parse(string(m.Data))
+
+	if err != nil {
+		return
+	}
+
+	buf := &bytes.Buffer{}
+
+	if err = tmpl.Execute(buf, ctx); err != nil {
+		return
+	}
+
+	var document Document
+
+	decoder := yaml.NewDecoder(buf)
+
+	for {
+		if err = decoder.Decode(&document); err != nil {
+			if err == io.EOF {
+				err = nil
+				break
+			}
+
+			return
+		}
+
+		manifest.Documents = append(manifest.Documents, document)
+	}
+
+	manifest.Name = m.Name
 
 	return
 }

@@ -24,8 +24,21 @@ var buildCmd = &cobra.Command{
 
 		manifestTemplates, err := deploy.LoadManifestTemplatesFromRoot(root)
 
+		ctx := deploy.Context{}
+
 		for _, manifestTemplate := range manifestTemplates {
-			fmt.Printf("- %s\n", manifestTemplate.Name)
+			manifest, err := manifestTemplate.Render(ctx)
+
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("- %s\n", manifest.Name)
+
+			for _, document := range manifest.Documents {
+				fmt.Printf("  - %s.%s:%s\n", document.APIVersion, document.Kind, document.Name)
+				fmt.Printf("    %v\n", document.Labels)
+			}
 		}
 
 		return err

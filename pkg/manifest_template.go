@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
-	"path/filepath"
 	"text/template"
 
 	"gopkg.in/yaml.v2"
@@ -14,8 +12,8 @@ import (
 
 // ManifestTemplate represents a templated Kubernetes manifest.
 type ManifestTemplate struct {
-	Name string
-	Data []byte
+	Name string `yaml:"name"`
+	Data string `yaml:"data"`
 }
 
 // LoadManifestTemplate loads a manifest template from a reader.
@@ -28,49 +26,14 @@ func LoadManifestTemplate(name string, r io.Reader) (ManifestTemplate, error) {
 
 	return ManifestTemplate{
 		Name: name,
-		Data: data,
+		Data: string(data),
 	}, nil
-}
-
-// LoadManifestTemplatesFromRoot load all the manifest template in the specified root directory.
-func LoadManifestTemplatesFromRoot(root string) (templates []ManifestTemplate, err error) {
-	var manifestTemplate ManifestTemplate
-
-	if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() && root != path {
-			return filepath.SkipDir
-		}
-
-		if ok, _ := filepath.Match("*.yaml", info.Name()); !ok {
-			return nil
-		}
-
-		f, err := os.Open(path)
-
-		if err != nil {
-			return err
-		}
-
-		defer f.Close()
-
-		if manifestTemplate, err = LoadManifestTemplate(info.Name(), f); err != nil {
-			return err
-		}
-
-		templates = append(templates, manifestTemplate)
-
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	return
 }
 
 // Render the manifest template.
 func (m ManifestTemplate) Render(ctx Context) (manifest Manifest, err error) {
 	var tmpl *template.Template
-	tmpl, err = template.New(m.Name).Parse(string(m.Data))
+	tmpl, err = template.New(m.Name).Parse(m.Data)
 
 	if err != nil {
 		return
@@ -82,8 +45,7 @@ func (m ManifestTemplate) Render(ctx Context) (manifest Manifest, err error) {
 		return
 	}
 
-	var document Document
-
+	document := Document{Context: ctx}
 	decoder := yaml.NewDecoder(buf)
 
 	for {
@@ -98,7 +60,7 @@ func (m ManifestTemplate) Render(ctx Context) (manifest Manifest, err error) {
 			return
 		}
 
-		manifest.Documents = append(manifest.Documents, document)
+		manifest.Documents = append(manifest.Documents, document.AsFlatList()...)
 	}
 
 	manifest.Name = m.Name

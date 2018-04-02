@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"encoding/json"
 	"fmt"
 
 	yaml "gopkg.in/yaml.v2"
@@ -8,12 +9,14 @@ import (
 
 // A Document represents Kubernetes document.
 type Document struct {
-	raw        map[interface{}]interface{}
-	apiVersion string
-	kind       string
-	name       string
-	labels     map[interface{}]interface{}
-	documents  []Document
+	Context     Context
+	raw         map[interface{}]interface{}
+	apiVersion  string
+	kind        string
+	name        string
+	labels      map[interface{}]interface{}
+	annotations map[interface{}]interface{}
+	documents   []Document
 }
 
 // Raw returns the raw document.
@@ -63,7 +66,8 @@ func (d *Document) init() error {
 			}
 
 			document := Document{
-				raw: raw,
+				Context: d.Context,
+				raw:     raw,
 			}
 
 			if err := document.init(); err != nil {
@@ -83,9 +87,42 @@ func (d *Document) init() error {
 			return fmt.Errorf("document %s has no `name`", d.Type())
 		}
 
-		if d.labels, ok = metadata["labels"].(map[interface{}]interface{}); !ok {
-			return fmt.Errorf("document %s has no `labels`", d.Type())
+		var labels interface{}
+
+		if labels, ok = metadata["labels"]; ok {
+			if d.labels, ok = labels.(map[interface{}]interface{}); !ok {
+				return fmt.Errorf("document %s `labels` has an unexpected format", d.Type())
+			}
+
+			if _, ok = d.labels[releaseLabel]; ok {
+				return fmt.Errorf("document %s already has a `%s` label which is not allowed", d.Type(), releaseLabel)
+			}
+		} else {
+			d.labels = make(map[interface{}]interface{})
 		}
+
+		var annotations interface{}
+
+		if annotations, ok = metadata["annotations"]; ok {
+			if d.annotations, ok = annotations.(map[interface{}]interface{}); !ok {
+				return fmt.Errorf("document %s `annotations` has an unexpected format", d.Type())
+			}
+		} else {
+			d.annotations = make(map[interface{}]interface{})
+		}
+
+		if _, ok = d.labels[releaseParametersAnnotation]; ok {
+			return fmt.Errorf("document %s already has a `%s` annotation which is not allowed", d.Type(), releaseParametersAnnotation)
+		}
+
+		d.name = fmt.Sprintf("%s%s", d.name, d.Context.NameSuffix())
+
+		// Add the reserved label. This step is mandatory.
+		d.labels[releaseLabel] = d.Context.Release
+
+		// As a debugging facility, mark the document with the set of deployment parameters.
+		releaseParameters, _ := json.Marshal(d.Context.Parameters)
+		d.annotations[releaseParametersAnnotation] = string(releaseParameters)
 	}
 
 	return nil
@@ -112,6 +149,11 @@ func (d Document) Name() string { return d.name }
 //
 // Lists don't have labels.
 func (d Document) Labels() map[interface{}]interface{} { return d.labels }
+
+// Annotations returns the annotations.
+//
+// Lists don't have annotations.
+func (d Document) Annotations() map[interface{}]interface{} { return d.annotations }
 
 // Documents returns the sub-documents.
 //

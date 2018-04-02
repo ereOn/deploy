@@ -2,9 +2,16 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 
 	deploy "github.com/ereOn/deploy/pkg"
 	"github.com/spf13/cobra"
+	yaml "gopkg.in/yaml.v2"
+)
+
+var (
+	outputFile = "-"
 )
 
 var rootCmd = &cobra.Command{
@@ -22,32 +29,33 @@ var buildCmd = &cobra.Command{
 			root = args[0]
 		}
 
-		manifestTemplates, err := deploy.LoadManifestTemplatesFromRoot(root)
+		deployment, err := deploy.LoadDeploymentFromRoot(root)
 
-		ctx := deploy.Context{}
-
-		for _, manifestTemplate := range manifestTemplates {
-			manifest, err := manifestTemplate.Render(ctx)
-
-			if err != nil {
-				return err
-			}
-
-			fmt.Printf("- %s\n", manifest.Name)
-
-			for _, document := range manifest.Documents {
-				for _, document := range document.AsFlatList() {
-					fmt.Printf("  - %s:%s\n", document.Type(), document.Name())
-					fmt.Printf("    %v\n", document.Labels())
-				}
-			}
+		if err != nil {
+			return err
 		}
 
-		return err
+		var output io.WriteCloser
+
+		if outputFile == "-" {
+			output = os.Stdout
+		} else {
+			output, err = os.Create(outputFile)
+		}
+
+		defer output.Close()
+
+		if err := yaml.NewEncoder(output).Encode(deployment); err != nil {
+			return fmt.Errorf("failed to write deployment: %s", err)
+		}
+
+		return nil
 	},
 }
 
 func init() {
+	buildCmd.Flags().StringVarP(&outputFile, "output-file", "o", outputFile, "The file to write the deployment to. Specify `-` to write to the standard output.")
+	buildCmd.MarkFlagFilename("output-file")
 	rootCmd.AddCommand(buildCmd)
 }
 

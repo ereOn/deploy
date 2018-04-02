@@ -4,11 +4,11 @@ items:
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    name: nginx-deployment-{{ .Release }}
+    name: nginx-deployment
     labels:
       app: nginx
   spec:
-    replicas: 3
+    replicas: {{ .Parameters.replicas }}
     selector:
       matchLabels:
         app: nginx

@@ -36,8 +36,10 @@ var buildCmd = &cobra.Command{
 			fmt.Printf("- %s\n", manifest.Name)
 
 			for _, document := range manifest.Documents {
-				fmt.Printf("  - %s.%s:%s\n", document.APIVersion, document.Kind, document.Name)
-				fmt.Printf("    %v\n", document.Labels)
+				for _, document := range document.AsFlatList() {
+					fmt.Printf("  - %s:%s\n", document.Type(), document.Name())
+					fmt.Printf("    %v\n", document.Labels())
+				}
 			}
 		}
 

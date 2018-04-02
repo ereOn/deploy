@@ -93,6 +93,8 @@ func (m ManifestTemplate) Render(ctx Context) (manifest Manifest, err error) {
 				break
 			}
 
+			err = fmt.Errorf("checking rendered output from `%s`: %s", m.Name, err)
+
 			return
 		}
 

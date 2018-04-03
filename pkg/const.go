@@ -1,5 +1,5 @@
 package deploy
 
-const deploymentUnitAttributesFilename = "deployment-attributes.yaml"
+const deploymentUnitAttributesFilename = "deploy.yaml"
 const releaseLabel = "deploy-release"
 const releaseParametersAnnotation = "deploy-release-parameters"

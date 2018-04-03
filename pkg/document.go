@@ -110,6 +110,10 @@ func (d *Document) init() error {
 }
 
 func (d *Document) initForRendering() error {
+	if d.IsList() {
+		return nil
+	}
+
 	// This is guaranteed to work if init() succeeded.
 	metadata := d.raw["metadata"].(map[interface{}]interface{})
 

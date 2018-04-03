@@ -1,0 +1,3 @@
+name: nginx
+parameters:
+  replicas: 2

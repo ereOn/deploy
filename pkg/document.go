@@ -3,8 +3,6 @@ package deploy
 import (
 	"encoding/json"
 	"fmt"
-
-	yaml "gopkg.in/yaml.v2"
 )
 
 // A Document represents Kubernetes document.
@@ -24,7 +22,7 @@ func (d Document) Raw() map[interface{}]interface{} { return d.raw }
 
 // MarshalYAML implements YAML serialization.
 func (d Document) MarshalYAML() (interface{}, error) {
-	return yaml.Marshal(d.raw)
+	return d.raw, nil
 }
 
 // UnmarshalYAML implements YAML deserialization.
@@ -93,10 +91,6 @@ func (d *Document) init() error {
 			if d.labels, ok = labels.(map[interface{}]interface{}); !ok {
 				return fmt.Errorf("document %s `labels` has an unexpected format", d.Type())
 			}
-
-			if _, ok = d.labels[releaseLabel]; ok {
-				return fmt.Errorf("document %s already has a `%s` label which is not allowed", d.Type(), releaseLabel)
-			}
 		} else {
 			d.labels = make(map[interface{}]interface{})
 		}
@@ -110,20 +104,33 @@ func (d *Document) init() error {
 		} else {
 			d.annotations = make(map[interface{}]interface{})
 		}
-
-		if _, ok = d.labels[releaseParametersAnnotation]; ok {
-			return fmt.Errorf("document %s already has a `%s` annotation which is not allowed", d.Type(), releaseParametersAnnotation)
-		}
-
-		d.name = fmt.Sprintf("%s%s", d.name, d.Context.NameSuffix())
-
-		// Add the reserved label. This step is mandatory.
-		d.labels[releaseLabel] = d.Context.Release
-
-		// As a debugging facility, mark the document with the set of deployment parameters.
-		releaseParameters, _ := json.Marshal(d.Context.Parameters)
-		d.annotations[releaseParametersAnnotation] = string(releaseParameters)
 	}
+
+	return nil
+}
+
+func (d *Document) initForRendering() error {
+	// This is guaranteed to work if init() succeeded.
+	metadata := d.raw["metadata"].(map[interface{}]interface{})
+
+	if value, ok := d.labels[releaseLabel]; ok {
+		return fmt.Errorf("document %s already has a `%s` label with value `%v` which is not allowed", d.Type(), releaseLabel, value)
+	}
+
+	if value, ok := d.annotations[releaseParametersAnnotation]; ok {
+		return fmt.Errorf("document %s already has a `%s` annotation with value `%v` which is not allowed", d.Type(), releaseParametersAnnotation, value)
+	}
+
+	d.name = fmt.Sprintf("%s%s", d.name, d.Context.NameSuffix())
+	metadata["name"] = d.name
+
+	// Add the reserved label. This step is mandatory.
+	d.labels[releaseLabel] = d.Context.Release
+
+	// As a debugging facility, mark the document with the set of deployment parameters.
+	releaseParameters, _ := json.Marshal(d.Context.Parameters)
+	d.annotations[releaseParametersAnnotation] = string(releaseParameters)
+	metadata["annotations"] = d.annotations
 
 	return nil
 }
@@ -172,4 +179,11 @@ func (d Document) AsFlatList() (documents []Document) {
 	}
 
 	return
+}
+
+// Release returns the document release.
+func (d Document) Release() string {
+	value, _ := d.labels[releaseLabel].(string)
+
+	return value
 }

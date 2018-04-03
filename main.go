@@ -11,7 +11,10 @@ import (
 )
 
 var (
+	verbose    = false
 	outputFile = "-"
+	release    = ""
+	namespace  = ""
 )
 
 var rootCmd = &cobra.Command{
@@ -19,17 +22,18 @@ var rootCmd = &cobra.Command{
 }
 
 var buildCmd = &cobra.Command{
-	Use:   "build",
-	Short: "Build a deployment.",
-	Args:  cobra.RangeArgs(0, 1),
+	Use:   "build [path]...",
+	Short: "Build a deployment",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		root := "."
+		paths := args
 
-		if len(args) > 0 {
-			root = args[0]
+		if len(paths) == 0 {
+			paths = []string{"."}
 		}
 
-		deployment, err := deploy.LoadDeploymentFromRoot(root)
+		cmd.SilenceUsage = true
+
+		deployment, err := deploy.LoadDeploymentFromPaths(paths)
 
 		if err != nil {
 			return err
@@ -53,10 +57,126 @@ var buildCmd = &cobra.Command{
 	},
 }
 
+var installCmd = &cobra.Command{
+	Use:   "install [deployment]",
+	Short: "Install a deployment",
+	Long:  "Install the specified deployment. If no deployment is specified, it will be expected from the standard input.",
+	Args:  cobra.RangeArgs(0, 1),
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
+		deploymentFile := ""
+
+		if len(args) > 0 {
+			deploymentFile = args[0]
+		}
+
+		cmd.SilenceUsage = true
+
+		var input io.ReadCloser
+
+		if deploymentFile == "" {
+			input = os.Stdin
+		} else {
+			if input, err = os.Open(deploymentFile); err != nil {
+				return err
+			}
+		}
+
+		defer input.Close()
+
+		decoder := yaml.NewDecoder(input)
+
+		var deployment deploy.Deployment
+
+		if err := decoder.Decode(&deployment); err != nil {
+			if err != io.EOF {
+				return fmt.Errorf("parsing deployment: %s", err)
+			}
+		}
+
+		ctx := deployment.NewContext(release, namespace)
+
+		var output []byte
+
+		if output, err = deploy.Install(deployment, ctx); err != nil {
+			return err
+		}
+
+		if verbose {
+			fmt.Fprintf(cmd.OutOrStderr(), "%s", output)
+		}
+
+		fmt.Fprintf(cmd.OutOrStderr(), "deployment units installed as \"%s\" in namespace \"%s\"\n", ctx.Release, ctx.Namespace)
+
+		return nil
+	},
+}
+
+var uninstallCmd = &cobra.Command{
+	Use:   "uninstall <release>",
+	Short: "Uninstall a deployment",
+	Long:  "Uninstall the deployment with the specified release.",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
+		release = args[0]
+
+		cmd.SilenceUsage = true
+
+		ctx := deploy.NewContext(release, namespace)
+
+		var output []byte
+
+		if output, err = deploy.Uninstall(ctx); err != nil {
+			return err
+		}
+
+		if verbose {
+			fmt.Fprintf(cmd.OutOrStderr(), "%s", output)
+		}
+
+		fmt.Fprintf(cmd.OutOrStderr(), "deployment units \"%s\" uninstalled from namespace \"%s\"\n", ctx.Release, ctx.Namespace)
+
+		return nil
+	},
+}
+
+var listCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all releases in the namespace",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
+
+		releases, err := deploy.List(namespace)
+
+		if err != nil {
+			return err
+		}
+
+		for _, release := range releases {
+			fmt.Fprintf(cmd.OutOrStdout(), "%s\n", release)
+		}
+
+		return nil
+	},
+}
+
 func init() {
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", verbose, "Enable verbose output.")
+
 	buildCmd.Flags().StringVarP(&outputFile, "output-file", "o", outputFile, "The file to write the deployment to. Specify `-` to write to the standard output.")
 	buildCmd.MarkFlagFilename("output-file")
+
 	rootCmd.AddCommand(buildCmd)
+
+	installCmd.Flags().StringVarP(&release, "release", "r", release, "The release name to use. If not specified, a random one will be generated.")
+	installCmd.Flags().StringVarP(&namespace, "namespace", "n", namespace, "The namespace name to install into. If not specified, `default` will be assumed.")
+	rootCmd.AddCommand(installCmd)
+
+	uninstallCmd.Flags().StringVarP(&namespace, "namespace", "n", namespace, "The namespace name to uninstall from. If not specified, `default` will be assumed.")
+	rootCmd.AddCommand(uninstallCmd)
+
+	listCmd.Flags().StringVarP(&namespace, "namespace", "n", namespace, "The namespace name to list releases from. If not specified, `default` will be assumed.")
+	rootCmd.AddCommand(listCmd)
 }
 
 func main() {

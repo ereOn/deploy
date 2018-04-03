@@ -50,7 +50,7 @@ func Uninstall(ctx Context) ([]byte, error) {
 }
 
 // List the deployment releases in the specified namespace.
-func List(namespace string) (releases []string, err error) {
+func List(namespace string) (releases map[string]ParametersType, err error) {
 	args := []string{"get", "all", fmt.Sprintf("--namespace=%s", namespace), "-o", "yaml"}
 	cmd := exec.Command("kubectl", args...)
 
@@ -70,16 +70,13 @@ func List(namespace string) (releases []string, err error) {
 		return nil, fmt.Errorf("failed to decode YAML output of kubectl: %s", err)
 	}
 
-	releasesSet := make(map[string]bool)
+	releases = make(map[string]ParametersType)
 
 	for _, document := range document.AsFlatList() {
 		if release := document.Release(); release != "" {
-			releasesSet[release] = true
+			// TODO: Read parameters for deployment unit
+			releases[release] = nil
 		}
-	}
-
-	for release := range releasesSet {
-		releases = append(releases, release)
 	}
 
 	return

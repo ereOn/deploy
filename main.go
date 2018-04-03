@@ -158,7 +158,7 @@ var listCmd = &cobra.Command{
 			return err
 		}
 
-		for _, release := range releases {
+		for release := range releases {
 			fmt.Fprintf(cmd.OutOrStdout(), "%s\n", release)
 		}
 

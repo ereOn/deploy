@@ -202,3 +202,10 @@ func (d Document) Release() string {
 
 	return value
 }
+
+// DeploymentUnit returns the document deployment unit.
+func (d Document) DeploymentUnit() string {
+	value, _ := d.labels[deploymentUnitLabel].(string)
+
+	return value
+}

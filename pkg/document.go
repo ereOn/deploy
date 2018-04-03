@@ -111,6 +111,12 @@ func (d *Document) init() error {
 
 func (d *Document) initForRendering() error {
 	if d.IsList() {
+		for i, document := range d.documents {
+			if err := document.initForRendering(); err != nil {
+				return fmt.Errorf("in sub-document %d of list document %s: %s", i, d.Type(), err)
+			}
+		}
+
 		return nil
 	}
 
@@ -119,6 +125,10 @@ func (d *Document) initForRendering() error {
 
 	if value, ok := d.labels[releaseLabel]; ok {
 		return fmt.Errorf("document %s already has a `%s` label with value `%v` which is not allowed", d.Type(), releaseLabel, value)
+	}
+
+	if value, ok := d.labels[deploymentUnitLabel]; ok {
+		return fmt.Errorf("document %s already has a `%s` label with value `%v` which is not allowed", d.Type(), deploymentUnitLabel, value)
 	}
 
 	if value, ok := d.annotations[releaseParametersAnnotation]; ok {
@@ -130,6 +140,7 @@ func (d *Document) initForRendering() error {
 
 	// Add the reserved label. This step is mandatory.
 	d.labels[releaseLabel] = d.Context.Release
+	d.labels[deploymentUnitLabel] = d.Context.DeploymentUnit
 
 	// As a debugging facility, mark the document with the set of deployment parameters.
 	releaseParameters, _ := json.Marshal(d.Context.Parameters)

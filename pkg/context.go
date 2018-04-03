@@ -12,9 +12,10 @@ type ParametersType map[string]interface{}
 
 // A Context represents a rendering context.
 type Context struct {
-	Release    string
-	Namespace  string
-	Parameters ParametersType
+	Release        string
+	Namespace      string
+	DeploymentUnit string
+	Parameters     ParametersType
 }
 
 // NewContext creates a new context.
@@ -40,11 +41,12 @@ func NewContext(release string, namespace string) Context {
 }
 
 // For returns a context specialized for the specified unit.
-func (c Context) For(name string) Context {
+func (c Context) For(deploymentUnit string) Context {
 	return Context{
-		Release:    c.Release,
-		Namespace:  c.Namespace,
-		Parameters: c.Parameters[name].(ParametersType),
+		Release:        c.Release,
+		Namespace:      c.Namespace,
+		DeploymentUnit: deploymentUnit,
+		Parameters:     c.Parameters[deploymentUnit].(ParametersType),
 	}
 }
 

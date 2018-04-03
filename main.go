@@ -112,28 +112,34 @@ var installCmd = &cobra.Command{
 }
 
 var uninstallCmd = &cobra.Command{
-	Use:   "uninstall <release>",
+	Use:   "uninstall <release>...",
 	Short: "Uninstall a deployment",
 	Long:  "Uninstall the deployment with the specified release.",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
-		release = args[0]
+		releases := args
 
 		cmd.SilenceUsage = true
 
-		ctx := deploy.NewContext(release, namespace)
+		for _, release := range releases {
+			if release == "" {
+				continue
+			}
 
-		var output []byte
+			ctx := deploy.NewContext(release, namespace)
 
-		if output, err = deploy.Uninstall(ctx); err != nil {
-			return err
+			var output []byte
+
+			if output, err = deploy.Uninstall(ctx); err != nil {
+				return err
+			}
+
+			if verbose {
+				fmt.Fprintf(cmd.OutOrStderr(), "%s", output)
+			}
+
+			fmt.Fprintf(cmd.OutOrStderr(), "deployment units \"%s\" uninstalled from namespace \"%s\"\n", ctx.Release, ctx.Namespace)
 		}
-
-		if verbose {
-			fmt.Fprintf(cmd.OutOrStderr(), "%s", output)
-		}
-
-		fmt.Fprintf(cmd.OutOrStderr(), "deployment units \"%s\" uninstalled from namespace \"%s\"\n", ctx.Release, ctx.Namespace)
 
 		return nil
 	},
